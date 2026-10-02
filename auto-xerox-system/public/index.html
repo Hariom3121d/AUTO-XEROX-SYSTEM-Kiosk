@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto-Xerox Kiosk - Self Service</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { margin: 0; background-color: #eef2f5; }
+    .kiosk-container { max-width: 900px; margin: 30px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
+    .header { background: #1a252f; color: #fff; padding: 25px; text-align: center; }
+    .header h1 { margin: 0; font-size: 26px; }
+    .header p { margin: 5px 0 0 0; color: #95a5a6; font-size: 14px; }
+    
+    /* Navigation Tabs */
+    .tabs { display: flex; background: #dae1e7; border-bottom: 2px solid #ccc; }
+    .tab-btn { flex: 1; padding: 15px; border: none; background: transparent; font-weight: 600; color: #7f8c8d; cursor: pointer; transition: 0.3s; }
+    .tab-btn.active { background: #fff; color: #2980b9; border-bottom: 3px solid #2980b9; }
+    .tab-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+    /* Content Panes */
+    .tab-content { display: none; padding: 30px; }
+    .tab-content.active { display: block; }
+
+    /* Upload Zone */
+    .drop-zone { border: 2px dashed #3498db; border-radius: 8px; padding: 50px; text-align: center; background: #f8fafc; cursor: pointer; transition: 0.2s; }
+    .drop-zone.highlight { background: #e1f0fa; border-color: #2980b9; }
+
+    /* Form Inputs */
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; }
+    .form-control { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    /* Buttons */
+    .btn { padding: 12px 25px; border: none; border-radius: 6px; font-weight: 600; font-size: 16px; cursor: pointer; transition: 0.2s; }
+    .btn-primary { background: #2980b9; color: #fff; }
+    .btn-primary:hover { background: #21618c; }
+    .btn-success { background: #27ae60; color: #fff; }
+
+    /* Payment & Price Display */
+    .price-badge { font-size: 20px; font-weight: 700; color: #27ae60; margin-top: 5px; }
+    .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #edf2f7; }
+    .summary-row.total { font-size: 18px; font-weight: 700; color: #2c3e50; border-bottom: none; }
+    
+    .qr-container { text-align: center; margin: 20px 0; }
+    .qr-container img { width: 180px; height: 180px; border: 2px solid #ddd; border-radius: 8px; padding: 5px; }
+
+    /* Status Banner */
+    .status-banner { padding: 15px; border-radius: 6px; font-weight: 600; text-align: center; }
+    .status-banner.info { background: #ebf8ff; color: #2b6cb0; }
+    .status-banner.success { background: #f0fff4; color: #276749; }
+    .status-banner.error { background: #fff5f5; color: #c53030; }
+  </style>
+</head>
+<body>
+
+  <div class="kiosk-container">
+    <div class="header">
+      <h1>🖨️ Auto-Xerox Self-Service Kiosk</h1>
+      <p>Quick, seamless document printing in seconds</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button id="tab1-btn" class="tab-btn active" onclick="switchTab(1)">1. Upload File</button>
+      <button id="tab2-btn" class="tab-btn" disabled onclick="switchTab(2)">2. Print Settings</button>
+      <button id="tab3-btn" class="tab-btn" disabled onclick="switchTab(3)">3. Payment</button>
+      <button id="tab4-btn" class="tab-btn" disabled onclick="switchTab(4)">4. Feedback & Status</button>
+    </div>
+
+    <!-- Tab 1: Upload File -->
+    <div id="tab-1" class="tab-content active">
+      <div id="drop-zone" class="drop-zone" onclick="document.getElementById('file-input').click()">
+        <h3>Drag & Drop your Document here</h3>
+        <p>Supported formats: PDF, DOCX, PNG, JPG (Max 50MB)</p>
+        <button class="btn btn-primary" type="button">📁 Browse & Upload File</button>
+        <input type="file" id="file-input" style="display: none;" accept=".pdf,.docx,.png,.jpg,.jpeg" onchange="handleFileSelect(event)">
+      </div>
+
+      <div id="file-info" style="display: none; margin-top: 20px;" class="summary-card">
+        <h4>Uploaded Document:</h4>
+        <p><strong>Name:</strong> <span id="file-name-display">-</span></p>
+        <p><strong>Detected Pages:</strong> <span id="page-count-display">1</span></p>
+      </div>
+    </div>
+
+    <!-- Tab 2: Print Settings -->
+    <div id="tab-2" class="tab-content">
+      <h2>Print Configuration</h2>
+      
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="copies-input">Number of Copies:</label>
+          <input type="number" id="copies-input" class="form-control" value="1" min="1" max="500">
+        </div>
+
+        <div class="form-group">
+          <label for="color-select">Color Mode:</label>
+          <select id="color-select" class="form-control">
+            <option value="bw" selected>Black & White (₹2 / page side)</option>
+            <option value="color">Full Color (₹10 / page side)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="sides-select">Print Sides:</label>
+          <select id="sides-select" class="form-control">
+            <option value="single" selected>Single-Sided (1 page per sheet)</option>
+            <option value="double">Double-Sided / Both Sides (saves paper)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="paper-size-select">Paper Size:</label>
+          <select id="paper-size-select" class="form-control">
+            <option value="A4" selected>A4 Standard (210 x 297 mm)</option>
+            <option value="A3">A3 Large Format (+₹5 surcharge)</option>
+            <option value="Letter">Letter (8.5 x 11 in)</option>
+            <option value="Legal">Legal (8.5 x 14 in)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="page-range-select">Page Range:</label>
+          <select id="page-range-select" class="form-control">
+            <option value="all" selected>All Pages</option>
+            <option value="custom">Custom Pages / Range</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="custom-range-wrapper" style="display: none;">
+          <label for="custom-pages-input">Specify Pages (e.g. 1-5, 8, 10):</label>
+          <input type="text" id="custom-pages-input" class="form-control" placeholder="e.g. 1-3, 5">
+        </div>
+
+        <div class="form-group">
+          <label for="orientation-select">Page Orientation:</label>
+          <select id="orientation-select" class="form-control">
+            <option value="portrait" selected>Portrait (Vertical)</option>
+            <option value="landscape">Landscape (Horizontal)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="nup-select">Pages per Sheet:</label>
+          <select id="nup-select" class="form-control">
+            <option value="1" selected>1 Page per Sheet</option>
+            <option value="2">2 Pages per Sheet (2-Up)</option>
+            <option value="4">4 Pages per Sheet (4-Up)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="summary-card" style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span style="font-size: 14px; color: #666;">Estimated Cost Calculation:</span>
+          <div id="live-total-price" class="price-badge" style="font-size: 24px;">₹2</div>
+        </div>
+        <button id="proceed-payment-btn" class="btn btn-primary" type="button" style="padding: 14px 28px;">
+          Proceed to Payment &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab 3: Payment -->
+    <div id="tab-3" class="tab-content">
+      <h2>Payment Details</h2>
+      <div class="summary-card">
+        <div class="summary-row"><span>Pages Selected:</span><span id="summary-pages">1</span></div>
+        <div class="summary-row"><span>Copies:</span><span id="summary-copies">1</span></div>
+        <div class="summary-row"><span>Base Rate per Side:</span>₹<span id="summary-rate">2</span></div>
+        <div class="summary-row total"><span>Total Payable Amount:</span>₹<span id="summary-total">2</span></div>
+      </div>
+
+      <div class="qr-container">
+        <h3>Scan UPI QR Code to Pay</h3>
+        <img id="upi-qr-image" src="" alt="Dynamic UPI QR Code">
+        <p>Supports PhonePe, Google Pay, Paytm & BHIM</p>
+      </div>
+
+      <div style="text-align: center;">
+        <button class="btn btn-success" type="button" onclick="submitPrintJob()">
+          Confirm & Print Now
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab 4: Feedback & Status -->
+    <div id="tab-4" class="tab-content">
+      <h2>Job Status</h2>
+      <div id="status-banner" class="status-banner info">
+        <span id="status-text">Initializing print process...</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
