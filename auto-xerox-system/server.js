@@ -3,92 +3,115 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-const pdfToPrinter = require('pdf-to-printer');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+// Use Render's dynamic PORT environment variable or fall back to 10000
+const PORT = process.env.PORT || 10000;
+
+// Enable CORS and request parsing
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve frontend static files from 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Ensure 'uploads' directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Configure File Storage via Multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniquePrefix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `${uniquePrefix}-${file.originalname}`);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
   }
 });
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB file size limit
 });
 
-// GET Endpoint: List all connected system printers
-app.get('/api/printers', async (req, res) => {
-  try {
-    const printers = await pdfToPrinter.getPrinters();
-    const defaultPrinter = await pdfToPrinter.getDefaultPrinter();
-    res.status(200).json({ success: true, defaultPrinter, printers });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to retrieve printers' });
-  }
+// In-Memory Print Job Queue for Local Hardware Relay
+let printJobsQueue = [];
+
+// Health Check Endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Render server active' });
 });
 
-// POST Endpoint: Submit and automatically print document
-app.post('/api/kiosk/submit-job', upload.single('document'), async (req, res) => {
+// 1. Submit Print Job (Called by Kiosk UI / Mobile Web App)
+app.post('/api/kiosk/submit-job', upload.single('document'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded.' });
     }
 
-    const { copies, colorMode, sides, paperSize, orientation } = req.body;
-    const filePath = req.file.path;
+    const { copies, colorMode, sides, paperSize, orientation, pagesPerSheet, amount } = req.body;
     const jobId = 'JOB-' + Math.floor(100000 + Math.random() * 900000);
 
-    console.log(`[+] New Job Submitted: ${jobId}`);
-    console.log(`    File Path: ${filePath}`);
-
-    // Build printer options
-    const printOptions = {
+    const jobData = {
+      id: jobId,
+      filename: req.file.filename,
+      filePath: req.file.path,
+      originalName: req.file.originalname,
       copies: parseInt(copies, 10) || 1,
+      colorMode: colorMode || 'bw',
+      sides: sides || 'single',
       paperSize: paperSize || 'A4',
-      side: sides === 'double' ? 'duplex' : 'simplex',
-      monochrome: colorMode === 'bw'
+      orientation: orientation || 'portrait',
+      pagesPerSheet: pagesPerSheet || 1,
+      amount: amount || 0,
+      createdAt: new Date().toISOString()
     };
 
-    console.log(`[*] Sending ${req.file.filename} to printer hardware...`);
+    // Add to pending queue for the local print agent
+    printJobsQueue.push(jobData);
 
-    pdfToPrinter
-      .print(filePath, printOptions)
-      .then(() => {
-        console.log(`[✓] Print Job ${jobId} successfully sent to hardware printer.`);
-      })
-      .catch((err) => {
-        console.error(`[✗] Hardware Print Failed for ${jobId}:`, err);
-      });
+    console.log(`[+] New Print Job Queued: ${jobId}`);
 
     return res.status(200).json({
       success: true,
       jobId: jobId,
-      message: 'Print job received and sent to printer queue.'
+      message: 'Print job submitted successfully.'
     });
   } catch (error) {
-    console.error('[-] Job Processing Error:', error);
+    console.error('[-] Error processing job:', error);
     return res.status(500).json({ success: false, error: 'Internal Server Error' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Auto-Xerox Kiosk Server running on http://localhost:${PORT}`);
+// 2. Poll Pending Jobs (Called by local Kiosk PC agent / print_agent.py)
+app.get('/api/agent/pending-jobs', (req, res) => {
+  res.status(200).json({ success: true, jobs: printJobsQueue });
+});
+
+// 3. Complete Print Job (Called by local Kiosk PC agent after physical printing)
+app.post('/api/agent/complete-job/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  printJobsQueue = printJobsQueue.filter(job => job.id !== jobId);
+  console.log(`[✓] Print Job Completed: ${jobId}`);
+  res.status(200).json({ success: true, message: `Job ${jobId} completed` });
+});
+
+// 4. Download File (Called by local Kiosk PC agent to retrieve print file)
+app.get('/uploads/:filename', (req, res) => {
+  const filePath = path.join(uploadDir, req.params.filename);
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
+// Start Express Server - Bound to '0.0.0.0' for Render deployment
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Auto-Xerox Kiosk Cloud Server running on port ${PORT}`);
 });
