@@ -8,7 +8,7 @@ import win32api
 # ==========================================
 # CONFIGURATION
 # ==========================================
-SERVER_URL = "http://localhost:3000/api/printer/next-job"
+SERVER_URL = "https://auto-xerox-system-kiosk.onrender.com/"
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 POLL_INTERVAL = 3  # Time in seconds between server checks
 

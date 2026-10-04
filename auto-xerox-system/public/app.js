@@ -305,3 +305,35 @@ window.proceedToPayment = proceedToPayment;
 window.switchTab = switchTab;
 window.handleFileSelect = handleFileSelect;
 window.submitPrintJob = submitPrintJob;
+async function payAndPrint(amount) {
+  const order = await fetch('/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount })
+  }).then(r => r.json());
+
+  const options = {
+    key: 'rzp_test_TjrSYPROZkAbXk',
+    amount: order.amount,
+    currency: order.currency,
+    order_id: order.id,
+    name: 'Auto-Xerox Kiosk',
+    handler: async function (response) {
+      const result = await fetch('/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(response)
+      }).then(r => r.json());
+
+      if (result.success) {
+        submitPrintJob(); // starts printing after payment
+      } else {
+        alert('Payment failed');
+      }
+    }
+  };
+
+  new Razorpay(options).open();
+}
+
+window.payAndPrint = payAndPrint;

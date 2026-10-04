@@ -173,6 +173,9 @@
         <div class="summary-row"><span>Base Rate per Side:</span>₹<span id="summary-rate">2</span></div>
         <div class="summary-row total"><span>Total Payable Amount:</span>₹<span id="summary-total">2</span></div>
       </div>
+      <button class="btn btn-primary" type="button" onclick="payAndPrint(KioskState.totalAmount)">
+        Pay NOW
+      </button>
 
       <div class="qr-container">
         <h3>Scan UPI QR Code to Pay</h3>
@@ -197,6 +200,7 @@
 
   </div>
 
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
