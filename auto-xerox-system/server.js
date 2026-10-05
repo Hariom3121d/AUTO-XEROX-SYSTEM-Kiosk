@@ -125,7 +125,8 @@ app.post('/create-order', async (req, res) => {
       currency: 'INR',
       receipt: 'rcpt_' + Date.now()
     });
-    res.json(order);
+    res.json({ ...order, key: process.env.RAZORPAY_KEY_ID});
+    
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Order failed' });

@@ -313,7 +313,7 @@ async function payAndPrint(amount) {
   }).then(r => r.json());
 
   const options = {
-    key: 'rzp_test_TjrSYPROZkAbXk',
+    key: order.key,
     amount: order.amount,
     currency: order.currency,
     order_id: order.id,
@@ -333,7 +333,9 @@ async function payAndPrint(amount) {
     }
   };
 
-  new Razorpay(options).open();
+  const rzpPopup = new Razorpay(options);
+rzpPopup.on('payment.failed', e => alert('Payment failed: ' + e.error.description));
+rzpPopup.open();
 }
 
 window.payAndPrint = payAndPrint;
