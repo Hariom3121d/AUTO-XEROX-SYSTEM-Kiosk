@@ -147,6 +147,31 @@ app.post('/verify-payment', (req, res) => {
     res.status(400).json({ success: false });
   }
 });
+
+const CLEAN_DIR = path.join(__dirname, 'uploads');
+const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function cleanOldFiles() {
+  fs.readdir(CLEAN_DIR, (err, files) => {
+    if (err) return console.error('Cleanup error:', err.message);
+    const now = Date.now();
+    files.forEach(file => {
+      const filePath = path.join(CLEAN_DIR, file);
+      fs.stat(filePath, (err, stats) => {
+        if (err || !stats.isFile()) return;
+        if (now - stats.mtimeMs > MAX_AGE_MS) {
+          fs.unlink(filePath, e => {
+            if (!e) console.log('Deleted old file:', file);
+          });
+        }
+      });
+    });
+  });
+}
+
+cleanOldFiles();
+setInterval(cleanOldFiles, 60 * 60 * 1000);
+
 // Start Express Server - Bound to '0.0.0.0' for Render deployment
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Auto-Xerox Kiosk Cloud Server running on port ${PORT}`);
